@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertCircle, UserPlus } from 'lucide-react';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client'; // Import Supabase Client
 
 const loginSchema = z.object({
   nip: z.string().min(1, 'NIP harus diisi').regex(/^\d+$/, 'NIP hanya boleh berisi angka'),
@@ -32,6 +33,45 @@ export default function Login() {
     navigate(from, { replace: true });
     return null;
   }
+
+  // --- MODIFIKASI: FUNGSI DARURAT UNTUK MEMBUAT AKUN DEMO ---
+  const handleEmergencyRegister = async () => {
+    if (!confirm("Apakah Anda yakin ingin membuat akun Auth untuk 'admin@lapas.local'? Gunakan ini hanya jika akun belum ada di Authentication Supabase.")) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 1. Coba daftar akun ke Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: 'admin@lapas.local',
+        password: '123456', // Password default sementara
+      });
+
+      if (authError) {
+        // Jika error karena user sudah ada, beri tahu user
+        if (authError.message.includes("already registered")) {
+            throw new Error("User auth sudah terdaftar. Masalahnya mungkin data belum terhubung ke tabel employees/users.");
+        }
+        throw authError;
+      }
+
+      if (!authData.user) throw new Error("Gagal membuat user auth.");
+
+      alert(`Sukses! Akun Auth dibuat.\nEmail: admin@lapas.local\nPassword: 123456\n\nSilakan coba login dengan NIP Demo.`);
+      
+      // Opsional: Coba login otomatis setelah daftar (biasanya butuh verifikasi email jika diaktifkan)
+      
+    } catch (err: any) {
+      console.error("Emergency Register Error:", err);
+      setError("Gagal membuat akun demo: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // ----------------------------------------------------------
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,10 +167,34 @@ export default function Login() {
                 'Masuk'
               )}
             </Button>
+
+            {/* --- MODIFIKASI: TOMBOL DARURAT --- */}
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Dev Area</span>
+                </div>
+            </div>
+
+            <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full border-dashed text-muted-foreground hover:text-primary"
+                onClick={handleEmergencyRegister}
+                disabled={isLoading}
+            >
+                <UserPlus className="mr-2 h-4 w-4" />
+                (Dev Only) Buat Akun Demo
+            </Button>
+            {/* ---------------------------------- */}
+
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Demo: NIP <code className="bg-muted px-1 rounded">198501012010011001</code></p>
+            <p className="text-xs mt-1">(Password Default setelah dibuat: 123456)</p>
           </div>
         </CardContent>
       </Card>
