@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ShieldCheck, AlertCircle, UserPlus } from 'lucide-react';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client'; // Import Supabase Client
+import { supabase } from '@/integrations/supabase/client';
 
 const loginSchema = z.object({
   nip: z.string().min(1, 'NIP harus diisi').regex(/^\d+$/, 'NIP hanya boleh berisi angka'),
@@ -28,57 +28,39 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
-  // Redirect if already logged in
-  if (user) {
-    navigate(from, { replace: true });
-    return null;
-  }
-
-  // --- MODIFIKASI: FUNGSI DARURAT UNTUK MEMBUAT AKUN DEMO ---
-  const handleEmergencyRegister = async () => {
-    if (!confirm("Apakah Anda yakin ingin membuat akun Auth untuk 'admin@lapas.local'? Gunakan ini hanya jika akun belum ada di Authentication Supabase.")) {
-      return;
+  // --- PERBAIKAN UTAMA: Navigasi Otomatis ---
+  // Kita menunggu sampai variable 'user' benar-benar terisi, baru pindah halaman.
+  // Ini mencegah kita ditendang balik oleh ProtectedRoute.
+  useEffect(() => {
+    if (user) {
+      navigate(from, { replace: true });
     }
+  }, [user, navigate, from]);
 
+  // --- Fitur Darurat (Dev Only) ---
+  const handleEmergencyRegister = async () => {
+    if (!confirm("Buat akun Auth untuk 'admin@lapas.local'?")) return;
     setIsLoading(true);
-    setError(null);
-
     try {
-      // 1. Coba daftar akun ke Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: 'admin@lapas.local',
-        password: '123456', // Password default sementara
+        password: '123456',
       });
-
-      if (authError) {
-        // Jika error karena user sudah ada, beri tahu user
-        if (authError.message.includes("already registered")) {
-            throw new Error("User auth sudah terdaftar. Masalahnya mungkin data belum terhubung ke tabel employees/users.");
-        }
-        throw authError;
-      }
-
-      if (!authData.user) throw new Error("Gagal membuat user auth.");
-
-      alert(`Sukses! Akun Auth dibuat.\nEmail: admin@lapas.local\nPassword: 123456\n\nSilakan coba login dengan NIP Demo.`);
-      
-      // Opsional: Coba login otomatis setelah daftar (biasanya butuh verifikasi email jika diaktifkan)
-      
+      if (error) throw error;
+      if (!data.user) throw new Error("Gagal membuat user auth.");
+      alert(`Sukses! Akun Auth dibuat.\nEmail: admin@lapas.local\nPassword: 123456\n\nSekarang coba login.`);
     } catch (err: any) {
-      console.error("Emergency Register Error:", err);
-      setError("Gagal membuat akun demo: " + err.message);
+      alert("Info: " + err.message);
     } finally {
       setIsLoading(false);
     }
   };
-  // ----------------------------------------------------------
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setValidationErrors({});
 
-    // Validate input
     const result = loginSchema.safeParse({ nip, password });
     if (!result.success) {
       const errors: { nip?: string; password?: string } = {};
@@ -96,10 +78,13 @@ export default function Login() {
 
     if (signInError) {
       setError(signInError);
-      setIsLoading(false);
-    } else {
-      navigate(from, { replace: true });
-    }
+      setIsLoading(false); // Stop loading jika error
+    } 
+    
+    // CATATAN PENTING:
+    // Jika sukses, kita JANGAN matikan isLoading dan JANGAN navigate manual.
+    // Kita biarkan 'useEffect' di atas yang mendeteksi perubahan user lalu memindahkan halaman.
+    // Jika data user valid, halaman akan pindah sendiri dalam hitungan milidetik.
   };
 
   return (
@@ -168,14 +153,9 @@ export default function Login() {
               )}
             </Button>
 
-            {/* --- MODIFIKASI: TOMBOL DARURAT --- */}
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Dev Area</span>
-                </div>
+            <div className="relative pt-2">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Dev Area</span></div>
             </div>
 
             <Button 
@@ -188,13 +168,10 @@ export default function Login() {
                 <UserPlus className="mr-2 h-4 w-4" />
                 (Dev Only) Buat Akun Demo
             </Button>
-            {/* ---------------------------------- */}
-
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Demo: NIP <code className="bg-muted px-1 rounded">198501012010011001</code></p>
-            <p className="text-xs mt-1">(Password Default setelah dibuat: 123456)</p>
           </div>
         </CardContent>
       </Card>
