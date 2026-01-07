@@ -92,7 +92,11 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-4 text-center pb-8">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <ShieldCheck className="w-8 h-8 text-primary" />
+            <img 
+              src="/favicon.ico" 
+              alt="Logo" 
+              className="w-8 h-8 text-primary" 
+            />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">Selamat Datang</CardTitle>
