@@ -56,7 +56,7 @@ export default function Dashboard() {
                 <LayoutDashboard className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold">RBAC System</h1>
+                <h1 className="text-lg font-semibold">MONALISA</h1>
                 <p className="text-xs text-muted-foreground">Role-Based Access Control</p>
               </div>
             </div>
