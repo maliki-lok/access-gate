@@ -22,7 +22,7 @@ import {
 
 const menuItems = [
   { path: '/admin', permission: 'access_admin', label: 'Admin Panel', icon: Settings, description: 'Kelola pengguna dan role' },
-  { path: '/test/kabapas', permission: 'access_kabapas', label: 'Kabapas', icon: Building2, description: 'Kepala Lapas' },
+  { path: '/test/kabapas', permission: 'access_kabapas', label: 'Kabapas', icon: Building2, description: 'Kepala Balai Pemasyarakatan' },
   { path: '/test/kasubsie', permission: 'access_kasubsie', label: 'Kasubsie', icon: Users, description: 'Kepala Sub Seksi' },
   { path: '/test/operator-registrasi', permission: 'access_operator_registrasi', label: 'Operator Registrasi', icon: ClipboardList, description: 'Registrasi' },
   { path: '/test/anev', permission: 'access_anev', label: 'Anev', icon: BarChart3, description: 'Analisis & Evaluasi' },
