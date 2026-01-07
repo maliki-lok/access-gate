@@ -26,7 +26,7 @@ const menuItems = [
   { path: '/test/kasubsie', permission: 'access_kasubsie', label: 'Kasubsie', icon: Users, description: 'Kepala Sub Seksi' },
   { path: '/test/operator-registrasi', permission: 'access_operator_registrasi', label: 'Operator Registrasi', icon: ClipboardList, description: 'Registrasi' },
   { path: '/test/anev', permission: 'access_anev', label: 'Anev', icon: BarChart3, description: 'Analisis & Evaluasi' },
-  { path: '/test/pk', permission: 'access_pk', label: 'PK', icon: User, description: 'Pembinaan Kepribadian' },
+  { path: '/test/pk', permission: 'access_pk', label: 'PK', icon: User, description: 'Pembimbing Kemasyarakatan' },
   { path: '/test/persuratan', permission: 'access_persuratan', label: 'Persuratan', icon: Mail, description: 'Manajemen Surat' },
   { path: '/test/bimker', permission: 'access_bimker', label: 'Bimker', icon: Briefcase, description: 'Bimbingan Kerja' },
   { path: '/test/bimkemas', permission: 'access_bimkemas', label: 'Bimkemas', icon: Users, description: 'Bimbingan Kemasyarakatan' },
