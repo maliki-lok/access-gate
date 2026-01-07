@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             jabatan,
             unit_kerja,
             email,
+            foto_url,
             created_at,
             updated_at
           )
