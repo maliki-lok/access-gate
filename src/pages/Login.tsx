@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ShieldCheck, AlertCircle, UserPlus } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
 
 const loginSchema = z.object({
   nip: z.string().min(1, 'NIP harus diisi').regex(/^\d+$/, 'NIP hanya boleh berisi angka'),
@@ -28,33 +27,12 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
-  // --- PERBAIKAN UTAMA: Navigasi Otomatis ---
-  // Kita menunggu sampai variable 'user' benar-benar terisi, baru pindah halaman.
-  // Ini mencegah kita ditendang balik oleh ProtectedRoute.
+  // --- Navigasi Otomatis ---
   useEffect(() => {
     if (user) {
       navigate(from, { replace: true });
     }
   }, [user, navigate, from]);
-
-  // --- Fitur Darurat (Dev Only) ---
-  const handleEmergencyRegister = async () => {
-    if (!confirm("Buat akun Auth untuk 'admin@lapas.local'?")) return;
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: 'admin@lapas.local',
-        password: '123456',
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error("Gagal membuat user auth.");
-      alert(`Sukses! Akun Auth dibuat.\nEmail: admin@lapas.local\nPassword: 123456\n\nSekarang coba login.`);
-    } catch (err: any) {
-      alert("Info: " + err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,13 +56,9 @@ export default function Login() {
 
     if (signInError) {
       setError(signInError);
-      setIsLoading(false); // Stop loading jika error
+      setIsLoading(false); 
     } 
-    
-    // CATATAN PENTING:
-    // Jika sukses, kita JANGAN matikan isLoading dan JANGAN navigate manual.
-    // Kita biarkan 'useEffect' di atas yang mendeteksi perubahan user lalu memindahkan halaman.
-    // Jika data user valid, halaman akan pindah sendiri dalam hitungan milidetik.
+    // Jika sukses, useEffect akan menangani navigasi
   };
 
   return (
@@ -156,27 +130,7 @@ export default function Login() {
                 'Masuk'
               )}
             </Button>
-
-            <div className="relative pt-2">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Dev Area</span></div>
-            </div>
-
-            <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full border-dashed text-muted-foreground hover:text-primary"
-                onClick={handleEmergencyRegister}
-                disabled={isLoading}
-            >
-                <UserPlus className="mr-2 h-4 w-4" />
-                (Dev Only) Buat Akun Demo
-            </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Demo: NIP <code className="bg-muted px-1 rounded">198501012010011001</code></p>
-          </div>
         </CardContent>
       </Card>
     </div>
