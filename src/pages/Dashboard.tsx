@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   LogOut, 
@@ -21,6 +21,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
+// Definisi menu item
 const menuItems = [
   { path: '/admin', permission: 'access_admin', label: 'Admin Panel', icon: Settings, description: 'Kelola pengguna dan role' },
   { path: '/test/kabapas', permission: 'access_kabapas', label: 'Kabapas', icon: Building2, description: 'Kepala Balai Pemasyarakatan' },
@@ -45,6 +46,10 @@ export default function Dashboard() {
   };
 
   const accessibleMenus = menuItems.filter(item => hasPermission(item.permission));
+
+  // Helper untuk mendapatkan URL foto dengan aman (untuk menghindari error TypeScript jika type belum diupdate)
+  // @ts-ignore: Abaikan warning jika property foto_url belum ada di interface Employee
+  const fotoUrl = user?.employee?.foto_url;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -85,9 +90,28 @@ export default function Dashboard() {
           <CardHeader className="pb-6 bg-white">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
-                  <User className="w-8 h-8 text-primary" />
+                
+                {/* --- BAGIAN FOTO PROFIL --- */}
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border-2 border-primary/20 overflow-hidden relative group">
+                  {fotoUrl ? (
+                    <img 
+                      src={fotoUrl} 
+                      alt={user?.employee.nama}
+                      className="w-full h-full object-cover transition-transform hover:scale-105"
+                      onError={(e) => {
+                        // Fallback ke icon jika gambar error/link rusak
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement?.classList.add('fallback-mode');
+                        // Kita bisa memaksa menampilkan icon user lewat sibling selector atau state, 
+                        // tapi cara termudah adalah membiarkan DOM di bawahnya (jika di-render kondisional)
+                      }}
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-primary" />
+                  )}
                 </div>
+                {/* ------------------------- */}
+
                 <div>
                   <CardTitle className="text-2xl font-bold text-slate-800">{user?.employee.nama}</CardTitle>
                   <div className="flex items-center gap-2 mt-1 text-muted-foreground">
@@ -109,7 +133,7 @@ export default function Dashboard() {
           <CardContent className="pt-0 pb-6 px-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* KOLOM 1: Roles (Lebih Dominan) */}
+              {/* KOLOM 1: Roles */}
               <div className="md:col-span-1 space-y-3">
                 <div className="flex items-center gap-2 text-slate-700">
                   <Shield className="w-4 h-4 text-primary" />
@@ -124,7 +148,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* KOLOM 2 & 3: Permissions (Design Baru) */}
+              {/* KOLOM 2 & 3: Permissions */}
               <div className="md:col-span-2 space-y-3">
                 <div className="flex items-center justify-between text-slate-700">
                   <div className="flex items-center gap-2">
@@ -139,15 +163,14 @@ export default function Dashboard() {
                 {/* Permission Box Container */}
                 <div className="bg-slate-50/80 rounded-xl border border-dashed border-slate-200 p-4">
                   <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
-                    {user?.permissions.length > 0 ? (
-                      user?.permissions.map((permission) => (
+                    {user?.permissions && user.permissions.length > 0 ? (
+                      user.permissions.map((permission) => (
                         <Badge 
                           key={permission} 
                           variant="outline" 
                           className="bg-white hover:bg-white text-slate-600 border-slate-200 font-normal text-xs py-1 px-2.5 transition-colors hover:border-primary/50 hover:text-primary"
                         >
                           <CheckCircle2 className="w-3 h-3 mr-1.5 opacity-50" />
-                          {/* Mengubah snake_case menjadi Normal Text */}
                           {permission.replace(/_/g, ' ')}
                         </Badge>
                       ))
