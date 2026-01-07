@@ -57,7 +57,6 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-lg font-semibold">MONALISA</h1>
-                <p className="text-xs text-muted-foreground">Role-Based Access Control</p>
               </div>
             </div>
             
