@@ -73,7 +73,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Selamat Datang</CardTitle>
+            <CardTitle className="text-2xl font-bold">Selamat Datang di MONALISA</CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
               Masuk dengan NIP dan password Anda
             </CardDescription>
