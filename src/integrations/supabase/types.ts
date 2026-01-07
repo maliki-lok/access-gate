@@ -16,32 +16,86 @@ export type Database = {
     Tables: {
       employees: {
         Row: {
+          agama: string | null
+          alamat: string | null
           created_at: string | null
           email: string | null
+          foto_thumbnail: string | null
+          foto_url: string | null
           id: string
           jabatan: string | null
+          jenis_jabatan: string | null
+          jenis_kelamin: string | null
+          jurusan_pendidikan: string | null
           nama: string
+          nama_gelar: string | null
+          nik: string | null
           nip: string
+          pangkat_golongan: string | null
+          pendidikan: string | null
+          status: string | null
+          tanggal_lahir: string | null
+          telepon: string | null
+          telepon_khusus: string | null
+          tempat_lahir: string | null
+          tmt_jabatan: string | null
+          tmt_pangkat: string | null
           unit_kerja: string | null
           updated_at: string | null
         }
         Insert: {
+          agama?: string | null
+          alamat?: string | null
           created_at?: string | null
           email?: string | null
+          foto_thumbnail?: string | null
+          foto_url?: string | null
           id?: string
           jabatan?: string | null
+          jenis_jabatan?: string | null
+          jenis_kelamin?: string | null
+          jurusan_pendidikan?: string | null
           nama: string
+          nama_gelar?: string | null
+          nik?: string | null
           nip: string
+          pangkat_golongan?: string | null
+          pendidikan?: string | null
+          status?: string | null
+          tanggal_lahir?: string | null
+          telepon?: string | null
+          telepon_khusus?: string | null
+          tempat_lahir?: string | null
+          tmt_jabatan?: string | null
+          tmt_pangkat?: string | null
           unit_kerja?: string | null
           updated_at?: string | null
         }
         Update: {
+          agama?: string | null
+          alamat?: string | null
           created_at?: string | null
           email?: string | null
+          foto_thumbnail?: string | null
+          foto_url?: string | null
           id?: string
           jabatan?: string | null
+          jenis_jabatan?: string | null
+          jenis_kelamin?: string | null
+          jurusan_pendidikan?: string | null
           nama?: string
+          nama_gelar?: string | null
+          nik?: string | null
           nip?: string
+          pangkat_golongan?: string | null
+          pendidikan?: string | null
+          status?: string | null
+          tanggal_lahir?: string | null
+          telepon?: string | null
+          telepon_khusus?: string | null
+          tempat_lahir?: string | null
+          tmt_jabatan?: string | null
+          tmt_pangkat?: string | null
           unit_kerja?: string | null
           updated_at?: string | null
         }
