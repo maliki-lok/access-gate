@@ -7,13 +7,9 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
+      // --- TABEL LAMA ---
       employees: {
         Row: {
           agama: string | null
@@ -241,6 +237,389 @@ export type Database = {
           },
         ]
       }
+
+      // --- TABEL BARU (OPERATOR REGISTRASI) ---
+      
+      petugas_pk: {
+        Row: {
+          id: string
+          employee_id: string | null
+          nip: string | null
+          nama: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          employee_id?: string | null
+          nip?: string | null
+          nama?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          employee_id?: string | null
+          nip?: string | null
+          nama?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+
+      klien: {
+        Row: {
+          id_klien: number
+          nama_klien: string | null
+          nomor_register_lapas: string | null
+          jenis_kelamin: string | null 
+          agama: string | null
+          tempat_lahir: string | null
+          tanggal_lahir: string | null
+          usia: number | null
+          kategori_usia: string | null
+          pendidikan: string | null
+          pekerjaan: string | null
+          minat_bakat: string | null
+          alamat: string | null
+          kelurahan: string | null
+          kecamatan: string | null
+          nomor_telepon: string | null
+        }
+        Insert: {
+          id_klien?: number
+          nama_klien?: string | null
+          nomor_register_lapas?: string | null
+          jenis_kelamin?: string | null
+          agama?: string | null
+          tempat_lahir?: string | null
+          tanggal_lahir?: string | null
+          usia?: number | null
+          kategori_usia?: string | null
+          pendidikan?: string | null
+          pekerjaan?: string | null
+          minat_bakat?: string | null
+          alamat?: string | null
+          kelurahan?: string | null
+          kecamatan?: string | null
+          nomor_telepon?: string | null
+        }
+        Update: {
+          id_klien?: number
+          nama_klien?: string | null
+          nomor_register_lapas?: string | null
+          jenis_kelamin?: string | null
+          agama?: string | null
+          tempat_lahir?: string | null
+          tanggal_lahir?: string | null
+          usia?: number | null
+          kategori_usia?: string | null
+          pendidikan?: string | null
+          pekerjaan?: string | null
+          minat_bakat?: string | null
+          alamat?: string | null
+          kelurahan?: string | null
+          kecamatan?: string | null
+          nomor_telepon?: string | null
+        }
+        Relationships: []
+      }
+
+      upt: {
+        Row: {
+          id_upt: number
+          nama_upt: string | null
+          jenis_upt: string | null
+          alamat: string | null
+        }
+        Insert: {
+          id_upt?: number
+          nama_upt?: string | null
+          jenis_upt?: string | null
+          alamat?: string | null
+        }
+        Update: {
+          id_upt?: number
+          nama_upt?: string | null
+          jenis_upt?: string | null
+          alamat?: string | null
+        }
+        Relationships: []
+      }
+
+      penjamin: {
+        Row: {
+          id_penjamin: number
+          id_klien: number | null
+          nama_penjamin: string | null
+          hubungan_klien: string | null
+          agama: string | null
+          tempat_lahir: string | null
+          tanggal_lahir: string | null
+          usia: number | null
+          pendidikan: string | null
+          pekerjaan: string | null
+          alamat: string | null
+          kelurahan: string | null
+          kecamatan: string | null
+          nomor_telepon: string | null
+        }
+        Insert: {
+          id_penjamin?: number
+          id_klien?: number | null
+          nama_penjamin?: string | null
+          hubungan_klien?: string | null
+          agama?: string | null
+          tempat_lahir?: string | null
+          tanggal_lahir?: string | null
+          usia?: number | null
+          pendidikan?: string | null
+          pekerjaan?: string | null
+          alamat?: string | null
+          kelurahan?: string | null
+          kecamatan?: string | null
+          nomor_telepon?: string | null
+        }
+        Update: {
+          id_penjamin?: number
+          id_klien?: number | null
+          nama_penjamin?: string | null
+          hubungan_klien?: string | null
+          agama?: string | null
+          tempat_lahir?: string | null
+          tanggal_lahir?: string | null
+          usia?: number | null
+          pendidikan?: string | null
+          pekerjaan?: string | null
+          alamat?: string | null
+          kelurahan?: string | null
+          kecamatan?: string | null
+          nomor_telepon?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "penjamin_id_klien_fkey"
+            columns: ["id_klien"]
+            isOneToOne: false
+            referencedRelation: "klien"
+            referencedColumns: ["id_klien"]
+          }
+        ]
+      }
+
+      litmas: {
+        Row: {
+          id_litmas: number
+          id_klien: number | null
+          id_upt: number | null
+          nama_pk: string | null 
+          nomor_urut: number | null
+          nomor_surat_masuk: string | null
+          tanggal_diterima_bapas: string | null
+          jenis_litmas: string | null
+          tanggal_registrasi: string | null
+          nomor_register_litmas: string | null
+          asal_bapas: string | null
+          nomor_surat_permintaan: string | null
+          tanggal_surat_permintaan: string | null
+          nomor_surat_pelimpahan: string | null
+          tanggal_surat_pelimpahan: string | null
+        }
+        Insert: {
+          id_litmas?: number
+          id_klien?: number | null
+          id_upt?: number | null
+          nama_pk?: string | null
+          nomor_urut?: number | null
+          nomor_surat_masuk?: string | null
+          tanggal_diterima_bapas?: string | null
+          jenis_litmas?: string | null
+          tanggal_registrasi?: string | null
+          nomor_register_litmas?: string | null
+          asal_bapas?: string | null
+          nomor_surat_permintaan?: string | null
+          tanggal_surat_permintaan?: string | null
+          nomor_surat_pelimpahan?: string | null
+          tanggal_surat_pelimpahan?: string | null
+        }
+        Update: {
+          id_litmas?: number
+          id_klien?: number | null
+          id_upt?: number | null
+          nama_pk?: string | null
+          nomor_urut?: number | null
+          nomor_surat_masuk?: string | null
+          tanggal_diterima_bapas?: string | null
+          jenis_litmas?: string | null
+          tanggal_registrasi?: string | null
+          nomor_register_litmas?: string | null
+          asal_bapas?: string | null
+          nomor_surat_permintaan?: string | null
+          tanggal_surat_permintaan?: string | null
+          nomor_surat_pelimpahan?: string | null
+          tanggal_surat_pelimpahan?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "litmas_id_klien_fkey"
+            columns: ["id_klien"]
+            isOneToOne: false
+            referencedRelation: "klien"
+            referencedColumns: ["id_klien"]
+          },
+          {
+            foreignKeyName: "litmas_id_upt_fkey"
+            columns: ["id_upt"]
+            isOneToOne: false
+            referencedRelation: "upt"
+            referencedColumns: ["id_upt"]
+          },
+          {
+            foreignKeyName: "litmas_nama_pk_fkey"
+            columns: ["nama_pk"]
+            isOneToOne: false
+            referencedRelation: "petugas_pk"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+
+      perkara: {
+        Row: {
+          id_perkara: number
+          id_litmas: number | null
+          pasal: string | null
+          uu_kuhp: string | null
+          perkara_utama: string | null
+          tindak_pidana: string | null
+          kategori_tindak_pidana: string | null
+          vonis_pidana: string | null
+          denda: number | null
+          subsider_pidana: string | null
+          uang_pengganti: number | null
+          subsider_uang_pengganti: string | null
+          remisi_bulan: number | null
+          remisi_hari: number | null
+          tanggal_mulai_ditahan: string | null
+          tanggal_sepertiga_masa: string | null
+          tanggal_setengah_masa: string | null
+          tanggal_duapertiga_masa: string | null
+          tanggal_ekspirasi: string | null
+          nomor_putusan: string | null
+          tanggal_putusan: string | null
+          nomor_surat_eksekusi: string | null
+          tanggal_surat_eksekusi: string | null
+        }
+        Insert: {
+          id_perkara?: number
+          id_litmas?: number | null
+          pasal?: string | null
+          uu_kuhp?: string | null
+          perkara_utama?: string | null
+          tindak_pidana?: string | null
+          kategori_tindak_pidana?: string | null
+          vonis_pidana?: string | null
+          denda?: number | null
+          subsider_pidana?: string | null
+          uang_pengganti?: number | null
+          subsider_uang_pengganti?: string | null
+          remisi_bulan?: number | null
+          remisi_hari?: number | null
+          tanggal_mulai_ditahan?: string | null
+          tanggal_sepertiga_masa?: string | null
+          tanggal_setengah_masa?: string | null
+          tanggal_duapertiga_masa?: string | null
+          tanggal_ekspirasi?: string | null
+          nomor_putusan?: string | null
+          tanggal_putusan?: string | null
+          nomor_surat_eksekusi?: string | null
+          tanggal_surat_eksekusi?: string | null
+        }
+        Update: {
+          id_perkara?: number
+          id_litmas?: number | null
+          pasal?: string | null
+          uu_kuhp?: string | null
+          perkara_utama?: string | null
+          tindak_pidana?: string | null
+          kategori_tindak_pidana?: string | null
+          vonis_pidana?: string | null
+          denda?: number | null
+          subsider_pidana?: string | null
+          uang_pengganti?: number | null
+          subsider_uang_pengganti?: string | null
+          remisi_bulan?: number | null
+          remisi_hari?: number | null
+          tanggal_mulai_ditahan?: string | null
+          tanggal_sepertiga_masa?: string | null
+          tanggal_setengah_masa?: string | null
+          tanggal_duapertiga_masa?: string | null
+          tanggal_ekspirasi?: string | null
+          nomor_putusan?: string | null
+          tanggal_putusan?: string | null
+          nomor_surat_eksekusi?: string | null
+          tanggal_surat_eksekusi?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perkara_id_litmas_fkey"
+            columns: ["id_litmas"]
+            isOneToOne: false
+            referencedRelation: "litmas"
+            referencedColumns: ["id_litmas"]
+          }
+        ]
+      }
+
+      perkara_tambahan: {
+        Row: {
+          id_perkara_tambahan: number
+          id_litmas: number | null
+          urutan: number | null
+          perkara: string | null
+          nomor_putusan: string | null
+          tanggal_putusan: string | null
+          vonis_pidana: string | null
+          denda: number | null
+          subsider_pidana: string | null
+          uang_pengganti: number | null
+          subsider_uang_pengganti: string | null
+        }
+        Insert: {
+          id_perkara_tambahan?: number
+          id_litmas?: number | null
+          urutan?: number | null
+          perkara?: string | null
+          nomor_putusan?: string | null
+          tanggal_putusan?: string | null
+          vonis_pidana?: string | null
+          denda?: number | null
+          subsider_pidana?: string | null
+          uang_pengganti?: number | null
+          subsider_uang_pengganti?: string | null
+        }
+        Update: {
+          id_perkara_tambahan?: number
+          id_litmas?: number | null
+          urutan?: number | null
+          perkara?: string | null
+          nomor_putusan?: string | null
+          tanggal_putusan?: string | null
+          vonis_pidana?: string | null
+          denda?: number | null
+          subsider_pidana?: string | null
+          uang_pengganti?: number | null
+          subsider_uang_pengganti?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perkara_tambahan_id_litmas_fkey"
+            columns: ["id_litmas"]
+            isOneToOne: false
+            referencedRelation: "litmas"
+            referencedColumns: ["id_litmas"]
+          }
+        ]
+      }
+
     }
     Views: {
       [_ in never]: never
