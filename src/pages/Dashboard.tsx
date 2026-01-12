@@ -259,79 +259,40 @@ export default function Dashboard() {
             <p className="text-slate-500">Selamat datang kembali di sistem manajemen.</p>
           </div>
 
-          {/* User Profile Card */}
-          <Card className="border-0 shadow-md overflow-hidden bg-white">
-            <div className="h-32 bg-gradient-to-r from-primary/80 to-primary/40"></div>
-            <CardHeader className="relative pb-0 pt-0 px-6 sm:px-8">
-              <div className="-mt-16 mb-4 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-                <div className="w-32 h-32 rounded-full border-4 border-white bg-white shadow-sm overflow-hidden flex items-center justify-center">
-                  {fotoUrl ? (
-                    <img src={fotoUrl} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-16 h-16 text-slate-300" />
-                  )}
-                </div>
-                <div className="text-center sm:text-left pb-4 flex-1">
-                  <h2 className="text-2xl font-bold text-slate-900">{user?.employee.nama}</h2>
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-slate-500 mt-1">
-                    <span className="flex items-center gap-1.5 text-sm">
-                      <Briefcase className="w-4 h-4" /> {user?.employee.nip}
-                    </span>
-                    <span className="hidden sm:inline text-slate-300">•</span>
-                    <span className="flex items-center gap-1.5 text-sm">
-                      <Building2 className="w-4 h-4" /> {user?.employee.unit_kerja || 'Unit Kerja'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="px-6 sm:px-8 py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Roles Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Shield className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold text-slate-900">Role Akses</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {user?.roles.map((role) => (
-                      <Badge key={role} className="px-3 py-1 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200 shadow-none">
-                        {role}
-                      </Badge>
-                    ))}
-                  </div>
+          {/* User Profile Card - Simplified */}
+          <Card className="mb-8 border-0 shadow-sm bg-white">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+                {/* Avatar */}
+                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                   {fotoUrl ? (
+                      <img src={fotoUrl} alt={user?.employee.nama} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : (
+                      <User className="w-10 h-10 text-slate-400" />
+                    )}
                 </div>
 
-                {/* Permissions Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b">
-                    <div className="flex items-center gap-2">
-                      <Key className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold text-slate-900">Permission</h3>
-                    </div>
-                    <Badge variant="outline" className="font-normal text-xs">
-                      {user?.permissions.length} items
-                    </Badge>
+                {/* User Details */}
+                <div className="flex-1 text-center md:text-left space-y-2">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">{user?.employee.nama}</h2>
+                    <p className="text-slate-500 text-sm flex items-center justify-center md:justify-start gap-2">
+                      <Briefcase className="w-3 h-3" />
+                      {user?.employee.jabatan || 'Staff'} - {user?.employee.unit_kerja || 'Unit Kerja'}
+                    </p>
                   </div>
                   
-                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-100 max-h-[200px] overflow-y-auto custom-scrollbar">
-                    <div className="flex flex-wrap gap-2">
-                      {user?.permissions && user.permissions.length > 0 ? (
-                        user.permissions.map((permission) => (
-                          <div key={permission} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs text-slate-600">
-                            <CheckCircle2 className="w-3 h-3 text-green-500" />
-                            {permission.replace(/_/g, ' ')}
-                          </div>
-                        ))
-                      ) : (
-                        <span className="text-sm text-slate-400 italic">Tidak ada permission.</span>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                     <Badge variant="outline" className="font-mono text-xs text-slate-500 bg-slate-50">
+                        NIP: {user?.employee.nip}
+                     </Badge>
+                     {user?.roles.map((role) => (
+                        <Badge key={role} className="bg-primary/10 text-primary hover:bg-primary/20 border-0">
+                          {role}
+                        </Badge>
+                     ))}
                   </div>
                 </div>
-
               </div>
             </CardContent>
           </Card>
