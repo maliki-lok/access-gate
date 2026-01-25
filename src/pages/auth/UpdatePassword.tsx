@@ -13,87 +13,71 @@ export default function UpdatePasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // State UI
-  const [loading, setLoading] = useState(false); // Loading saat submit form
-  const [verifying, setVerifying] = useState(true); // Loading saat cek link
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Error state
+  // State Logika
+  const [sessionReady, setSessionReady] = useState(false); // Apakah user sudah terautentikasi?
+  const [loading, setLoading] = useState(false); // Loading saat submit
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    const initRecovery = async () => {
-      // 1. Ambil Hash dari URL (ini berisi token rahasia)
-      const hash = window.location.hash;
-      const hasToken = hash && (hash.includes('access_token') || hash.includes('type=recovery'));
-      
-      // 2. Cek apakah kita SUDAH punya sesi aktif?
+    const initializeAuth = async () => {
+      // 1. Cek Sesi Eksisting (Mungkin browser menyimpan sesi lama atau proses pertukaran token sudah selesai)
       const { data: { session } } = await supabase.auth.getSession();
-
-      if (session) {
-        // User sudah login (aman)
-        if(mounted) setVerifying(false);
+      
+      if (session && mounted) {
+        console.log("Sesi ditemukan langsung.");
+        setSessionReady(true);
         return;
       }
 
-      // 3. Jika tidak ada sesi DAN tidak ada token di URL -> Error
-      if (!hasToken) {
-        if(mounted) {
-            setErrorMsg("Link tidak valid atau URL rusak.");
-            setVerifying(false);
-        }
-        return;
-      }
-
-      // 4. Jika ada Token, kita tunggu Supabase memprosesnya.
-      // Kita pasang listener.
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log(`Auth Event: ${event}`);
-
-        // Event: PASSWORD_RECOVERY -> Supabase mendeteksi ini flow reset password
-        // Event: SIGNED_IN -> Token berhasil ditukar jadi sesi
-        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+      // 2. Jika sesi belum ada, kita DENGARKAN perubahan auth.
+      // Ini adalah kunci perbaikannya. Kita tunggu Supabase Client menyelesaikan tugasnya.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log(`Auth Event Triggered: ${event}`);
+        
+        if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
           if (mounted) {
-             setVerifying(false); // Hore! Form boleh muncul
-             setErrorMsg(null);
+            console.log("Token berhasil ditukar menjadi Sesi.");
+            setSessionReady(true);
           }
         }
         
-        // Event: SIGNED_OUT -> Abaikan saja jika kita sedang menunggu proses token
+        // Abaikan event SIGNED_OUT, karena itu bisa terjadi sebelum SIGNED_IN
       });
 
-      // 5. Timeout Safety (Jaga-jaga jika Supabase macet)
-      // Jika dalam 5 detik tidak ada hasil, tampilkan error manual.
+      // 3. Failsafe Timeout (Jaga-jaga jika 6 detik tidak ada kejadian apa-apa)
       setTimeout(async () => {
-        if (mounted) {
-            // Cek sekali lagi
-            const { data: { session: retrySession } } = await supabase.auth.getSession();
-            if (!retrySession && verifying) {
-                setErrorMsg("Waktu verifikasi habis atau link kadaluarsa.");
-                setVerifying(false);
+        if (mounted && !sessionReady) {
+            // Cek sekali lagi, siapa tahu sesi sudah masuk tapi event terlewat
+            const { data: { session: finalCheck } } = await supabase.auth.getSession();
+            if (finalCheck) {
+                 setSessionReady(true);
+            } else {
+                 // Benar-benar gagal
+                 setErrorMessage("Gagal memverifikasi link. Pastikan link belum pernah dipakai sebelumnya.");
             }
         }
-      }, 5000); // Beri waktu 5 detik
+      }, 6000); // 6 Detik waktu tunggu
 
       return () => {
         subscription.unsubscribe();
       };
     };
 
-    initRecovery();
+    initializeAuth();
 
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency array agar hanya jalan sekali saat mount
+  }, []); // Dependencies kosong = hanya jalan sekali saat mount
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (password.length < 6) {
       toast.error('Password minimal 6 karakter');
       return;
     }
-
     if (password !== confirmPassword) {
       toast.error('Konfirmasi password tidak cocok');
       return;
@@ -102,56 +86,37 @@ export default function UpdatePasswordPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-
+      const { error } = await supabase.auth.updateUser({ password: password });
       if (error) throw error;
 
       toast.success('Password berhasil diperbarui! Mengarahkan ke login...');
-      
-      // Logout bersih & redirect
       await supabase.auth.signOut();
-      setTimeout(() => {
-          navigate('/login');
-      }, 1500);
+      setTimeout(() => navigate('/login'), 1500);
 
     } catch (error: any) {
-      console.error('Error updating password:', error);
       toast.error('Gagal: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- RENDER STATES ---
+  // --- RENDER LOGIC ---
 
-  // 1. Sedang Memverifikasi Link
-  if (verifying) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <h3 className="font-medium text-lg">Memverifikasi Link...</h3>
-        <p className="text-sm text-muted-foreground">Mohon tunggu sebentar, jangan tutup halaman ini.</p>
-      </div>
-    );
-  }
-
-  // 2. Jika Error (Link Basi / Invalid)
-  if (errorMsg) {
+  // 1. Jika Error Failsafe Muncul
+  if (errorMessage && !sessionReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <Card className="w-full max-w-md shadow-lg border-red-200 border">
+        <Card className="w-full max-w-md border-red-200">
             <CardHeader className="text-center">
                 <div className="mx-auto bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                     <AlertCircle className="h-6 w-6 text-red-600" />
                 </div>
-                <CardTitle className="text-red-600">Akses Ditolak</CardTitle>
-                <CardDescription>{errorMsg}</CardDescription>
+                <CardTitle className="text-red-600">Link Tidak Valid</CardTitle>
+                <CardDescription>{errorMessage}</CardDescription>
             </CardHeader>
             <CardFooter>
-                <Button className="w-full" onClick={() => navigate('/login')}>
-                    Kembali ke Halaman Login
+                <Button className="w-full" variant="outline" onClick={() => navigate('/login')}>
+                    Kembali ke Login
                 </Button>
             </CardFooter>
         </Card>
@@ -159,7 +124,18 @@ export default function UpdatePasswordPage() {
     );
   }
 
-  // 3. Form Utama (Sukses)
+  // 2. Jika Masih Loading / Menunggu Token (Sesi belum siap)
+  if (!sessionReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <h2 className="text-lg font-semibold text-gray-700">Memverifikasi Keamanan...</h2>
+        <p className="text-sm text-gray-500">Mohon tunggu, sedang menghubungkan ke server.</p>
+      </div>
+    );
+  }
+
+  // 3. Jika Sesi Siap (Form Muncul)
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary animate-in fade-in zoom-in duration-300">
@@ -168,9 +144,7 @@ export default function UpdatePasswordPage() {
             <Lock className="h-6 w-6 text-primary" />
           </div>
           <CardTitle>Atur Password Baru</CardTitle>
-          <CardDescription>
-            Silakan masukkan password baru untuk akun Anda.
-          </CardDescription>
+          <CardDescription>Silakan masukkan password baru Anda.</CardDescription>
         </CardHeader>
         <form onSubmit={handleUpdatePassword}>
           <CardContent className="space-y-4">
@@ -198,7 +172,7 @@ export default function UpdatePasswordPage() {
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-2">
+          <CardFooter>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Simpan Password Baru
