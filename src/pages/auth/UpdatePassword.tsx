@@ -6,76 +6,85 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, AlertCircle } from 'lucide-react';
 
 export default function UpdatePasswordPage() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(true);
+  
+  // State UI
+  const [loading, setLoading] = useState(false); // Loading saat submit form
+  const [verifying, setVerifying] = useState(true); // Loading saat cek link
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Error state
 
   useEffect(() => {
     let mounted = true;
 
-    const handleAuthCheck = async () => {
-      // 1. Cek apakah ini link recovery (ada hash di URL)
+    const initRecovery = async () => {
+      // 1. Ambil Hash dari URL (ini berisi token rahasia)
       const hash = window.location.hash;
-      const isRecoveryLink = hash && (hash.includes('type=recovery') || hash.includes('access_token'));
+      const hasToken = hash && (hash.includes('access_token') || hash.includes('type=recovery'));
+      
+      // 2. Cek apakah kita SUDAH punya sesi aktif?
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // Listener Auth
+      if (session) {
+        // User sudah login (aman)
+        if(mounted) setVerifying(false);
+        return;
+      }
+
+      // 3. Jika tidak ada sesi DAN tidak ada token di URL -> Error
+      if (!hasToken) {
+        if(mounted) {
+            setErrorMsg("Link tidak valid atau URL rusak.");
+            setVerifying(false);
+        }
+        return;
+      }
+
+      // 4. Jika ada Token, kita tunggu Supabase memprosesnya.
+      // Kita pasang listener.
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log(`Auth Event: ${event}`); // Debugging
+        console.log(`Auth Event: ${event}`);
 
-        if (event === 'SIGNED_OUT') {
-          // --- PERBAIKAN UTAMA DISINI ---
-          // Jika user terdeteksi membuka link recovery, ABAIKAN event SIGNED_OUT.
-          // Supabase sering memecat event ini sebelum memproses token baru.
-          if (isRecoveryLink) {
-            console.log("Mengabaikan SIGNED_OUT karena sedang mode recovery...");
-            return;
+        // Event: PASSWORD_RECOVERY -> Supabase mendeteksi ini flow reset password
+        // Event: SIGNED_IN -> Token berhasil ditukar jadi sesi
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+          if (mounted) {
+             setVerifying(false); // Hore! Form boleh muncul
+             setErrorMsg(null);
           }
         }
-
-        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-          // Berhasil masuk!
-          if (mounted) setIsProcessing(false);
-        }
+        
+        // Event: SIGNED_OUT -> Abaikan saja jika kita sedang menunggu proses token
       });
 
-      // 2. Cek manual session saat ini
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        if (mounted) setIsProcessing(false);
-      } else if (!isRecoveryLink) {
-        // Jika tidak ada session DAN bukan link recovery, baru tendang keluar
+      // 5. Timeout Safety (Jaga-jaga jika Supabase macet)
+      // Jika dalam 5 detik tidak ada hasil, tampilkan error manual.
+      setTimeout(async () => {
         if (mounted) {
-           toast.error("Link tidak valid.");
-           navigate('/login');
-        }
-      } else {
-        // Jika ini recovery link tapi session belum siap, 
-        // kita tunggu sebentar (handling race condition)
-        setTimeout(async () => {
+            // Cek sekali lagi
             const { data: { session: retrySession } } = await supabase.auth.getSession();
-            if (retrySession && mounted) {
-                setIsProcessing(false);
+            if (!retrySession && verifying) {
+                setErrorMsg("Waktu verifikasi habis atau link kadaluarsa.");
+                setVerifying(false);
             }
-        }, 2000); 
-      }
-      
+        }
+      }, 5000); // Beri waktu 5 detik
+
       return () => {
         subscription.unsubscribe();
       };
     };
 
-    handleAuthCheck();
+    initRecovery();
 
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, []); // Empty dependency array agar hanya jalan sekali saat mount
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,44 +102,64 @@ export default function UpdatePasswordPage() {
     setLoading(true);
 
     try {
-      // Kita update user. Jika session sebenarnya mati, ini akan throw error.
       const { error } = await supabase.auth.updateUser({
         password: password
       });
 
       if (error) throw error;
 
-      toast.success('Password berhasil diperbarui! Silakan login kembali.');
+      toast.success('Password berhasil diperbarui! Mengarahkan ke login...');
       
       // Logout bersih & redirect
       await supabase.auth.signOut();
-      navigate('/login');
+      setTimeout(() => {
+          navigate('/login');
+      }, 1500);
 
     } catch (error: any) {
       console.error('Error updating password:', error);
-      // Jika errornya karena session not found, baru kita arahkan ke login
-      if (error.message.includes('Auth session missing') || error.message.includes('not logged in')) {
-         toast.error("Sesi kadaluarsa. Silakan minta link reset baru.");
-         navigate('/login');
-      } else {
-         toast.error('Gagal: ' + error.message);
-      }
+      toast.error('Gagal: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Tampilkan loading screen hanya jika benar-benar sedang memproses link
-  // Tapi kita biarkan form muncul lebih cepat agar user tidak bingung
-  if (isProcessing) {
+  // --- RENDER STATES ---
+
+  // 1. Sedang Memverifikasi Link
+  if (verifying) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Memproses link keamanan...</p>
+        <h3 className="font-medium text-lg">Memverifikasi Link...</h3>
+        <p className="text-sm text-muted-foreground">Mohon tunggu sebentar, jangan tutup halaman ini.</p>
       </div>
     );
   }
 
+  // 2. Jika Error (Link Basi / Invalid)
+  if (errorMsg) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md shadow-lg border-red-200 border">
+            <CardHeader className="text-center">
+                <div className="mx-auto bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <CardTitle className="text-red-600">Akses Ditolak</CardTitle>
+                <CardDescription>{errorMsg}</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button className="w-full" onClick={() => navigate('/login')}>
+                    Kembali ke Halaman Login
+                </Button>
+            </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // 3. Form Utama (Sukses)
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary animate-in fade-in zoom-in duration-300">
