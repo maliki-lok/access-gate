@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Search, Plus, Shield, X, Key, Loader2, UserCheck, AlertCircle } from 'lucide-react';
+import { Search, Plus, Shield, X, Key, Loader2, UserCheck, AlertCircle, Trash2, Eye, MessageCircle, Lock } from 'lucide-react'; 
 import type { Employee, Role } from '@/types/auth';
 
 // Interface Data
@@ -18,7 +18,14 @@ interface UserWithDetails {
   id: string;
   employee_id: string;
   created_at: string;
-  employee: Employee;
+  employee: {
+    id: string;
+    nama: string;
+    nip: string;
+    email: string;
+    jabatan: string;
+    telepon?: string; // FIX: Sesuai kolom database 'telepon'
+  };
   roles: Role[];
 }
 
@@ -43,11 +50,22 @@ export function UserManagement() {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  // --- DATA FETCHING (Optimized) ---
+  // State Delete User
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithDetails | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // State Detail User
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [userToView, setUserToView] = useState<UserWithDetails | null>(null);
+
+  // State Send WhatsApp
+  const [isSendingWA, setIsSendingWA] = useState<string | null>(null);
+
+  // --- DATA FETCHING ---
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Menggunakan Promise.all untuk mengambil semua data secara paralel (Fix N+1 Problem)
       const [usersResponse, rolesResponse, employeesResponse] = await Promise.all([
         supabase
           .from('users')
@@ -55,7 +73,7 @@ export function UserManagement() {
             id,
             employee_id,
             created_at,
-            employees (*),
+            employees (*), 
             user_roles (
               roles (
                 id,
@@ -74,25 +92,20 @@ export function UserManagement() {
       if (rolesResponse.error) throw rolesResponse.error;
       if (employeesResponse.error) throw employeesResponse.error;
 
-      // Set Master Data
       setAllRoles(rolesResponse.data || []);
 
-      // Mapping & Flattening Data User
       const rawUsers = usersResponse.data || [];
       const formattedUsers: UserWithDetails[] = rawUsers.map((u: any) => ({
         id: u.id,
         employee_id: u.employee_id,
         created_at: u.created_at,
-        employee: u.employees as Employee,
-        // Flatten user_roles array menjadi roles array yang bersih
+        employee: u.employees, // Supabase akan otomatis mapping kolom 'telepon' jika ada di table
         roles: u.user_roles ? u.user_roles.map((ur: any) => ur.roles).filter(Boolean) : []
       }));
 
-      // Filter hanya user yang memiliki data employee valid
       const validUsers = formattedUsers.filter(u => u.employee);
       setUsers(validUsers);
 
-      // Filter Employees yang belum punya akun User
       const userEmployeeIds = new Set(rawUsers.map((u: any) => u.employee_id));
       const availableEmployees = (employeesResponse.data || []).filter(
         emp => !userEmployeeIds.has(emp.id)
@@ -131,14 +144,12 @@ export function UserManagement() {
         return;
       }
 
-      // Pastikan session valid sebelum panggil edge function
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
           toast.error("Sesi habis. Silakan login ulang.");
           return;
       }
 
-      // Panggil Edge Function
       const { error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: employee.email,
@@ -149,7 +160,6 @@ export function UserManagement() {
       });
 
       if (error) {
-        // Parsing error message dari edge function jika ada
         let msg = 'Gagal membuat user';
         try {
             const parsed = JSON.parse(error.message);
@@ -160,19 +170,93 @@ export function UserManagement() {
       
       toast.success(`User untuk ${employee.nama} berhasil dibuat`);
       setShowCreateDialog(false);
-      
-      // Reset Form
       setSelectedEmployee('');
       setPassword('');
       setSelectedRoles([]);
-      
-      fetchData(); // Refresh data
+      fetchData();
 
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast.error(error.message);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // --- HANDLER: KIRIM LINK RESET VIA WHATSAPP ---
+  const handleSendWhatsappReset = async (user: UserWithDetails) => {
+    // 1. Validasi No HP (Gunakan kolom 'telepon')
+    const phone = user.employee.telepon; 
+    
+    if (!phone) {
+      toast.error("Pegawai ini tidak memiliki Nomor Telepon yang terdaftar.");
+      return;
+    }
+
+    // 2. Validasi Email
+    if (!user.employee.email) {
+      toast.error("User ini tidak memiliki email akun (diperlukan untuk generate link).");
+      return;
+    }
+
+    // --- LOGIKA URL REDIRECT (CUSTOM DOMAIN) ---
+    // Jika sedang development (localhost), pakai origin browser.
+    // Jika production, paksa gunakan domain vercel Anda.
+    const baseUrl = window.location.hostname === 'localhost' 
+        ? window.location.origin 
+        : 'https://monalisa-navy.vercel.app';
+
+    setIsSendingWA(user.id);
+    try {
+      const { error } = await supabase.functions.invoke('admin-send-whatsapp', {
+        body: {
+          email: user.employee.email, // Untuk generate link auth
+          phone: phone,               // Untuk tujuan kirim WA
+          nama: user.employee.nama,   // Untuk sapaan
+          // Arahkan user ke halaman update-password di domain yang sesuai
+          redirectTo: `${baseUrl}/update-password` 
+        }
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        try {
+            const body = JSON.parse(error.message); 
+            if (body && body.error) errorMessage = body.error;
+        } catch { }
+        throw new Error(errorMessage);
+      }
+
+      toast.success(`Link reset terkirim ke WhatsApp ${user.employee.nama}`);
+      
+    } catch (error: any) {
+      console.error("Error sending WA:", error);
+      toast.error("Gagal mengirim WA: " + error.message);
+    } finally {
+      setIsSendingWA(null);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+        const { error } = await supabase.functions.invoke('admin-delete-user', {
+            body: { userId: userToDelete.id }
+        });
+
+        if (error) throw error;
+
+        toast.success(`Akun ${userToDelete.employee?.nama} berhasil dihapus`);
+        setShowDeleteDialog(false);
+        setUserToDelete(null);
+        fetchData(); 
+    } catch (error: any) {
+        console.error('Error deleting user:', error);
+        toast.error('Gagal menghapus user: ' + error.message);
+    } finally {
+        setIsDeleting(false);
     }
   };
 
@@ -207,8 +291,6 @@ export function UserManagement() {
   };
 
   const handleRemoveRole = async (userId: string, roleId: string) => {
-    // Optimistic UI: Kita bisa update state lokal dulu jika mau, 
-    // tapi untuk keamanan kita tunggu response DB di sini.
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -356,7 +438,6 @@ export function UserManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Mobile Responsive Wrapper */}
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader className="bg-muted/50">
@@ -370,7 +451,6 @@ export function UserManagement() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  // UX Improvement: Skeleton Loading Rows
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell>
@@ -438,7 +518,6 @@ export function UserManagement() {
                             </Badge>
                           ))}
                           
-                          {/* Add Role Button */}
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="icon" className="h-5 w-5 rounded-full border-dashed opacity-70 hover:opacity-100">
@@ -481,18 +560,65 @@ export function UserManagement() {
                          </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 px-2 text-muted-foreground hover:text-primary"
-                            onClick={() => {
-                                setUserToUpdate(user);
-                                setShowPasswordDialog(true);
-                            }}
-                        >
-                            <Key className="h-4 w-4 mr-2" />
-                            Reset Password
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                            {/* Tombol Detail User */}
+                            <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 px-2 text-muted-foreground hover:text-blue-600"
+                                title="Lihat Detail Akun"
+                                onClick={() => {
+                                    setUserToView(user);
+                                    setShowDetailDialog(true);
+                                }}
+                            >
+                                <Eye className="h-4 w-4" />
+                            </Button>
+
+                            {/* Tombol Kirim WhatsApp */}
+                            <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 px-2 text-muted-foreground hover:text-green-600"
+                                title="Kirim Link Reset Password via WhatsApp"
+                                onClick={() => handleSendWhatsappReset(user)}
+                                disabled={isSendingWA === user.id}
+                            >
+                                {isSendingWA === user.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <MessageCircle className="h-4 w-4" />
+                                )}
+                            </Button>
+
+                            {/* Tombol Reset Manual */}
+                            <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 px-2 text-muted-foreground hover:text-primary"
+                                title="Set Password Manual"
+                                onClick={() => {
+                                    setUserToUpdate(user);
+                                    setShowPasswordDialog(true);
+                                }}
+                            >
+                                <Key className="h-4 w-4" />
+                            </Button>
+
+                            {/* Tombol Hapus User */}
+                            <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                                title="Hapus Akun User"
+                                onClick={() => {
+                                    setUserToDelete(user);
+                                    setShowDeleteDialog(true);
+                                }}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -502,6 +628,78 @@ export function UserManagement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* --- DIALOG DETAIL USER --- */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Detail Akun Pengguna</DialogTitle>
+                <DialogDescription>Informasi lengkap terkait akun pegawai.</DialogDescription>
+            </DialogHeader>
+            
+            {userToView && (
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Nama Lengkap</Label>
+                            <p className="font-medium text-sm">{userToView.employee.nama}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">NIP</Label>
+                            <p className="font-mono font-medium text-sm bg-slate-100 px-2 py-1 rounded inline-block">
+                                {userToView.employee.nip}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Email Login</Label>
+                            <p className="font-mono text-sm">{userToView.employee.email}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Nomor Telepon</Label>
+                            <p className="font-mono text-sm">
+                                {userToView.employee.telepon || <span className="text-red-500 italic">Belum diisi</span>}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Password Saat Ini</Label>
+                        <div className="flex items-center justify-between border rounded px-3 py-2 bg-slate-50 opacity-80">
+                            <span className="text-sm font-mono tracking-widest">••••••••••••</span>
+                            <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                                <Lock className="h-3 w-3" /> Terenkripsi
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                            *Password tidak dapat dilihat. Gunakan tombol <b>WhatsApp</b> atau <b>Kunci</b> untuk mereset.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Jabatan</Label>
+                            <p className="text-sm">{userToView.employee.jabatan}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Terdaftar Sejak</Label>
+                            <p className="text-sm text-muted-foreground">
+                                {new Date(userToView.created_at).toLocaleDateString('id-ID', {
+                                    day: 'numeric', month: 'long', year: 'numeric'
+                                })}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <DialogFooter>
+                <Button onClick={() => setShowDetailDialog(false)}>Tutup</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Ganti Password */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
@@ -530,6 +728,31 @@ export function UserManagement() {
                 <Button onClick={handleChangePassword} disabled={isUpdatingPassword}>
                     {isUpdatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Simpan Password
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Hapus User (NEW) */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Hapus Akun Pengguna</DialogTitle>
+                <DialogDescription>
+                    Apakah Anda yakin ingin menghapus akun login untuk <b>{userToDelete?.employee?.nama}</b>?
+                    <br /><br />
+                    <span className="text-red-600 font-bold">Tindakan ini tidak dapat dibatalkan.</span>
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>Batal</Button>
+                <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteUser} 
+                    disabled={isDeleting}
+                >
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Ya, Hapus Akun
                 </Button>
             </DialogFooter>
         </DialogContent>
