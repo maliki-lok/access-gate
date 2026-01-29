@@ -12,11 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   Gavel, Calendar, User, FileText, Plus, AlertCircle, Clock, 
   CheckCircle, XCircle, RefreshCw, Layers, History, List, 
-  MoreHorizontal, Pencil, Trash2
+  MoreHorizontal, Pencil, Trash2, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -56,6 +57,7 @@ export default function TPPTest() {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [tempDate, setTempDate] = useState(''); 
   const [datesToSave, setDatesToSave] = useState<string[]>([]); 
+  const [defaultQuota, setDefaultQuota] = useState(50); 
 
   // State Dialog EDIT Jadwal
   const [isEditScheduleOpen, setIsEditScheduleOpen] = useState(false);
@@ -119,23 +121,27 @@ export default function TPPTest() {
 
   const handleBulkCreateSchedule = async () => {
     if (datesToSave.length === 0) return toast.error("Pilih tanggal dulu.");
+    
     const insertData = datesToSave.map(date => ({
         tanggal_sidang: date,
         jenis_sidang: 'Sidang TPP', 
-        status: 'Open'
+        status: 'Open',
+        kuota: defaultQuota
     }));
+
     const { error } = await (supabase as any).from('tpp_schedules').insert(insertData);
     if (error) toast.error(error.message);
     else {
-        toast.success(`${datesToSave.length} jadwal berhasil dibuka.`);
+        toast.success(`${datesToSave.length} jadwal berhasil dibuka dengan kuota ${defaultQuota}.`);
         setIsScheduleOpen(false);
         setDatesToSave([]);
+        setDefaultQuota(50);
     }
   };
 
   // --- LOGIC: MASTER JADWAL (EDIT & DELETE) ---
   const handleOpenEditSchedule = (sch: any) => {
-    setEditingSchedule({ ...sch }); // Copy object
+    setEditingSchedule({ ...sch }); 
     setIsEditScheduleOpen(true);
   };
 
@@ -146,7 +152,8 @@ export default function TPPTest() {
             .from('tpp_schedules')
             .update({
                 tanggal_sidang: editingSchedule.tanggal_sidang,
-                status: editingSchedule.status
+                status: editingSchedule.status,
+                kuota: editingSchedule.kuota
             })
             .eq('id', editingSchedule.id);
 
@@ -159,13 +166,9 @@ export default function TPPTest() {
   };
 
   const handleDeleteSchedule = async (id: string) => {
-    // Validasi sederhana: Cek apakah ada peserta di jadwal ini
     const hasParticipants = participants.some(p => p.tpp_schedule_id === id);
     
     if (hasParticipants) {
-        // Jika kebijakan ketat, tolak hapus.
-        // Jika kebijakan longgar, hapus saja (tapi peserta jadi orphan).
-        // Disini kita beri warning.
         if(!window.confirm("PERINGATAN: Ada klien yang sudah terdaftar di jadwal ini. Jika dihapus, jadwal klien tersebut akan hilang. Lanjutkan?")) {
             return;
         }
@@ -194,17 +197,32 @@ export default function TPPTest() {
     setIsDecisionOpen(true);
   };
 
+  // FUNGSI INI YANG DIPERBARUI SESUAI REQUEST
   const submitDecision = async () => {
     if (!selectedLitmas) return;
+
+    // 1. Siapkan Payload Update
+    let updatePayload: any = {
+        status: decision,
+        anev_notes: decisionNote,
+        waktu_sidang_tpp: new Date().toISOString(), // TAMBAHAN: Waktu Sidang
+    };
+
+    // 2. Jika Putusan Final (Setuju/Tolak), set Waktu Selesai
+    if (decision === 'Disetujui' || decision === 'Ditolak') {
+        updatePayload.waktu_selesai = new Date().toISOString(); // TAMBAHAN: Waktu Selesai
+    }
+
     try {
         const { error } = await supabase
             .from('litmas')
-            .update({ status: decision, anev_notes: decisionNote } as any)
+            .update(updatePayload)
             .eq('id_litmas', selectedLitmas.id_litmas);
 
         if (error) throw error;
         toast.success(`Putusan: ${decision} disimpan.`);
         setIsDecisionOpen(false);
+        fetchParticipants(); // Refresh data
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -235,7 +253,8 @@ export default function TPPTest() {
                 .insert({
                     tanggal_sidang: rescheduleDate,
                     jenis_sidang: 'Sidang Ulang',
-                    status: 'Open'
+                    status: 'Open',
+                    kuota: 50 
                 })
                 .select()
                 .single();
@@ -278,9 +297,12 @@ export default function TPPTest() {
   const sortedQueueDates = Object.keys(groupedQueue).sort();
   const rejectedHearings = participants.filter(p => ['Ditolak', 'Hold'].includes(p.status));
   const finishedHearings = participants.filter(p => ['Disetujui', 'Selesai'].includes(p.status));
-  // Filter jadwal aktif (Masa depan atau hari ini)
   const activeSchedules = schedules.filter(s => new Date(s.tanggal_sidang) >= new Date(todayStr));
 
+  // Helper Hitung Kuota Terisi
+  const getRegisteredCount = (scheduleId: string) => {
+      return participants.filter(p => p.tpp_schedule_id === scheduleId).length;
+  };
 
   return (
     <TestPageLayout
@@ -423,7 +445,7 @@ export default function TPPTest() {
                 </Card>
             </TabsContent>
 
-            {/* 5. MASTER JADWAL (FITUR BARU: EDIT & DELETE) */}
+            {/* 5. MASTER JADWAL */}
             <TabsContent value="master">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Slot Jadwal Dibuka</h3>
@@ -432,11 +454,16 @@ export default function TPPTest() {
                     </Button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {activeSchedules.map((sch) => (
+                    {activeSchedules.map((sch) => {
+                        const filled = getRegisteredCount(sch.id);
+                        const quota = sch.kuota || 50;
+                        const percentage = Math.min((filled / quota) * 100, 100);
+
+                        return (
                         <Card key={sch.id} className="border hover:shadow-md transition-shadow text-center relative group">
                             
-                            {/* MENU DROPDOWN (EDIT/DELETE) */}
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* MENU DROPDOWN */}
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full">
@@ -445,7 +472,7 @@ export default function TPPTest() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => handleOpenEditSchedule(sch)}>
-                                            <Pencil className="mr-2 h-4 w-4" /> Edit
+                                            <Pencil className="mr-2 h-4 w-4" /> Edit & Kuota
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleDeleteSchedule(sch.id)} className="text-red-600">
                                             <Trash2 className="mr-2 h-4 w-4" /> Hapus
@@ -457,14 +484,25 @@ export default function TPPTest() {
                             <CardHeader className="py-4 bg-slate-50 border-b">
                                 <CardTitle className="text-base">{formatDate(sch.tanggal_sidang)}</CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-4 pb-2">
-                                <p className="text-xs text-muted-foreground uppercase font-bold">{new Date(sch.tanggal_sidang).toLocaleDateString('id-ID', { weekday: 'long' })}</p>
-                                <Badge variant="outline" className={`mt-2 ${sch.status === 'Dibatalkan' ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>
+                            <CardContent className="pt-4 pb-4 px-4">
+                                <p className="text-xs text-muted-foreground uppercase font-bold mb-3">{new Date(sch.tanggal_sidang).toLocaleDateString('id-ID', { weekday: 'long' })}</p>
+                                
+                                {/* PROGRESS BAR KUOTA */}
+                                <div className="space-y-1 mb-3">
+                                    <div className="flex justify-between text-[10px] text-slate-600">
+                                        <span>Terisi: {filled}</span>
+                                        <span className="font-bold">Total: {quota}</span>
+                                    </div>
+                                    <Progress value={percentage} className={`h-2 ${percentage >= 100 ? 'bg-red-100' : 'bg-slate-100'}`} />
+                                    {percentage >= 100 && <span className="text-[10px] text-red-600 font-bold">PENUH</span>}
+                                </div>
+
+                                <Badge variant="outline" className={`w-full justify-center ${sch.status === 'Dibatalkan' ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>
                                     {sch.status}
                                 </Badge>
                             </CardContent>
                         </Card>
-                    ))}
+                    )})}
                 </div>
             </TabsContent>
         </Tabs>
@@ -511,7 +549,7 @@ export default function TPPTest() {
                     <div className="space-y-2">
                         <Label>Pilih Tanggal Baru</Label>
                         <Input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} min={todayStr} />
-                        <p className="text-[10px] text-muted-foreground">*Slot jadwal akan otomatis dibuat jika belum ada.</p>
+                        <p className="text-[10px] text-muted-foreground">*Slot jadwal akan otomatis dibuat (Quota 50) jika belum ada.</p>
                     </div>
                 </div>
                 <DialogFooter>
@@ -523,8 +561,26 @@ export default function TPPTest() {
         {/* 3. Modal Bulk Jadwal */}
         <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
             <DialogContent>
-                <DialogHeader><DialogTitle>Buka Slot Jadwal (Bulk)</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Buka Slot Jadwal</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-2">
+                    {/* Input Kuota */}
+                    <div className="space-y-2">
+                        <Label>Atur Slot / Kuota (Per Hari)</Label>
+                        <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-slate-500"/>
+                            <Input 
+                                type="number" 
+                                value={defaultQuota} 
+                                onChange={(e) => setDefaultQuota(parseInt(e.target.value))} 
+                                className="w-24"
+                                min={1}
+                            />
+                            <span className="text-sm text-muted-foreground">klien</span>
+                        </div>
+                    </div>
+
+                    <div className="border-t my-2"></div>
+
                     <div className="flex gap-2 items-end">
                         <div className="flex-1 space-y-2">
                             <Label>Tanggal</Label>
@@ -555,6 +611,14 @@ export default function TPPTest() {
                                 type="date" 
                                 value={editingSchedule.tanggal_sidang} 
                                 onChange={(e) => setEditingSchedule({...editingSchedule, tanggal_sidang: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Slot / Kuota</Label>
+                            <Input 
+                                type="number" 
+                                value={editingSchedule.kuota} 
+                                onChange={(e) => setEditingSchedule({...editingSchedule, kuota: parseInt(e.target.value)})}
                             />
                         </div>
                         <div className="space-y-2">

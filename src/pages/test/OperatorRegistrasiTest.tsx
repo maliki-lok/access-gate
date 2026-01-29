@@ -428,6 +428,9 @@ export default function OperatorRegistrasiTest() {
         
         nomor_surat_pelimpahan: formData.get('nomor_surat_pelimpahan') as string,
         tanggal_surat_pelimpahan: (formData.get('tanggal_surat_pelimpahan') as string) || null,
+        
+        waktu_registrasi: new Date().toISOString(), // Otomatis terisi
+        waktu_tunjuk_pk: new Date().toISOString()   // Karena langsung tunjuk PK
       };
 
       if(editingLitmas) {

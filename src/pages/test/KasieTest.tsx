@@ -14,11 +14,11 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Search, CheckCircle, Clock, Users, 
   Eye, FileCheck, Loader2, 
-  BarChart3, AlertTriangle, Shield, FileText, ExternalLink
+  BarChart3, AlertTriangle, Shield, FileText, ExternalLink, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Interfaces
+// Interfaces Updated
 interface LitmasData {
   id_litmas: number;
   nomor_surat_permintaan: string;
@@ -31,6 +31,14 @@ interface LitmasData {
   hasil_litmas_url: string | null;
   klien?: { nama_klien: string; nomor_register_lapas: string; } | null;
   petugas?: { id: string; nama: string; nip: string; } | null;
+  
+  // Timeline Fields
+  waktu_registrasi?: string;
+  waktu_upload_surat_tugas?: string;
+  waktu_upload_laporan?: string;
+  waktu_verifikasi_anev?: string;
+  waktu_sidang_tpp?: string;
+  waktu_selesai?: string;
 }
 
 interface OfficerStats {
@@ -125,6 +133,14 @@ export default function KasieDashboard() {
     if(!path) return;
     const { data } = supabase.storage.from('documents').getPublicUrl(path);
     window.open(data.publicUrl, '_blank');
+  };
+  
+  const formatDateTime = (isoString: string | null | undefined) => {
+    if (!isoString) return '-';
+    return new Date(isoString).toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
   };
 
   const filteredLitmas = litmasList.filter(item => 
@@ -278,7 +294,7 @@ export default function KasieDashboard() {
 
         {/* MODAL DETAIL (VIEW ONLY) */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh]">
               <DialogHeader>
                   <div className="flex items-center justify-between mr-6">
                       <DialogTitle>Detail Pengawasan</DialogTitle>
@@ -311,6 +327,58 @@ export default function KasieDashboard() {
                         </div>
                       </div>
                   </div>
+
+                  {/* BAGIAN BARU: TIMELINE HISTORY */}
+                  <div className="border rounded-md p-4 bg-slate-50">
+                      <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                          <History className="w-4 h-4 text-blue-600"/> Riwayat Proses
+                      </h4>
+                      <div className="relative border-l-2 border-slate-200 ml-2 space-y-6">
+                          
+                          {/* 1. Registrasi */}
+                          <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_registrasi ? 'bg-green-500 border-green-500' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold">Registrasi & Penunjukan PK</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_registrasi)}</p>
+                          </div>
+
+                          {/* 2. Upload Surat Tugas */}
+                          <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_upload_surat_tugas ? 'bg-green-500 border-green-500' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold">Upload Surat Tugas (PK)</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_upload_surat_tugas)}</p>
+                          </div>
+
+                          {/* 3. Upload Laporan */}
+                          <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_upload_laporan ? 'bg-green-500 border-green-500' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold">Upload Laporan Litmas (PK)</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_upload_laporan)}</p>
+                          </div>
+
+                          {/* 4. Verifikasi Anev */}
+                          <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_verifikasi_anev ? 'bg-green-500 border-green-500' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold">Verifikasi & Approval (Anev)</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_verifikasi_anev)}</p>
+                          </div>
+
+                          {/* 5. Sidang TPP */}
+                          <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_sidang_tpp ? 'bg-green-500 border-green-500' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold">Pelaksanaan Sidang TPP</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_sidang_tpp)}</p>
+                          </div>
+
+                           {/* 6. Selesai */}
+                           <div className="ml-6 relative">
+                              <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-2 ${selectedItem?.waktu_selesai ? 'bg-blue-600 border-blue-600' : 'bg-slate-200 border-slate-300'}`}></div>
+                              <p className="text-xs font-semibold text-blue-700">Selesai</p>
+                              <p className="text-[10px] text-slate-500">{formatDateTime(selectedItem?.waktu_selesai)}</p>
+                          </div>
+                      </div>
+                  </div>
+
               </div>
           </DialogContent>
         </Dialog>

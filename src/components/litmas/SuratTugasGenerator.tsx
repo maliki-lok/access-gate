@@ -93,7 +93,7 @@ export const SuratTugasGenerator = ({ litmasId, onSuccess }: SuratTugasGenerator
   };
 
   return (
-    <Button onClick={generateDocument} disabled={loading} variant="outline" size="sm" className="h-7 text-xs gap-2">
+    <Button onClick={generateDocument} disabled={loading} variant="outline" size="sm" className="w-full h-9 text-xs gap-2 font-medium shadow-sm">
       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
       Download Surat
     </Button>
