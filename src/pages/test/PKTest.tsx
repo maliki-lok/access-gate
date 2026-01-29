@@ -1,209 +1,256 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TestPageLayout } from '@/components/TestPageLayout';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { SuratTugasGenerator } from '@/components/litmas/SuratTugasGenerator'; 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, FileText, Calendar, RefreshCcw, Eye } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { User, RefreshCcw, Upload, CheckCircle, AlertCircle, Clock, FileText, Calendar, HelpCircle, CheckSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function PKTest() {
   const { toast } = useToast();
   const { user, hasRole } = useAuth();
-  const [tasks, setTasks] = useState<any[]>([]); // Gunakan any[] agar aman dari error tipe
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
+  
+  // State Pendaftaran TPP
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [selectedLitmasId, setSelectedLitmasId] = useState<number | null>(null);
+  const [availableSchedules, setAvailableSchedules] = useState<any[]>([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
 
-  // Cek apakah user adalah admin
   const isAdmin = hasRole('admin');
 
+  // Fetch Tasks
   const fetchMyTasks = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
       let pkId = null;
-
-      // 1. LOGIKA ID PETUGAS (Khusus Non-Admin)
       if (!isAdmin) {
-        const { data: pkData, error: pkError } = await supabase
-          .from('petugas_pk')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (pkError) throw pkError;
-
-        if (!pkData) {
-          setTasks([]);
-          setLoading(false);
-          return;
-        }
+        const { data: pkData } = await supabase.from('petugas_pk').select('id').eq('user_id', user.id).maybeSingle();
+        if (!pkData) { setTasks([]); setLoading(false); return; }
         pkId = pkData.id;
       }
 
-      // 2. QUERY UTAMA
-      // FIX TYPESCRIPT ERROR: Deklarasikan 'query' sebagai 'any' untuk memutus validasi tipe rekursif
-      let query: any = supabase
+      // FIX: Gunakan (supabase as any) dan ganti order ke 'created_at'
+      let query: any = (supabase as any)
         .from('litmas')
         .select(`
             *,
-            klien:klien!fk_litmas_klien (
-                nama_klien,
-                nomor_register_lapas,
-                kategori_usia
-            ),
-            petugas_pk:petugas_pk!fk_litmas_pk (
-                nama, nip
-            )
+            klien:klien!litmas_id_klien_fkey (nama_klien, nomor_register_lapas, kategori_usia),
+            petugas_pk:petugas_pk!litmas_nama_pk_fkey (nama, nip),
+            jadwal:tpp_schedules!litmas_tpp_schedule_id_fkey (tanggal_sidang, jenis_sidang)
         `)
-        .order('id_litmas', { ascending: false });
+        .order('created_at', { ascending: false }); // PERBAIKAN DISINI: updated_at -> created_at
 
-      // 3. FILTERING
-      // Jika Admin: Filter ini DILEWATI (melihat semua)
-      // Jika PK: Filter 'nama_pk' diterapkan
-      if (!isAdmin && pkId) {
-        query = query.eq('nama_pk', pkId);
-      }
+      if (!isAdmin && pkId) query = query.eq('nama_pk', pkId);
 
       const { data, error } = await query;
-
       if (error) throw error;
-      
       setTasks(data || []);
-      
     } catch (error: any) {
-      console.error("Fetch Error:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Gagal memuat tugas", 
-        description: error.message 
-      });
+      toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchMyTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { 
+      fetchMyTasks(); 
+      // Fetch Jadwal dengan (supabase as any)
+      const fetchSchedules = async () => {
+          const { data } = await (supabase as any)
+            .from('tpp_schedules')
+            .select('*')
+            .eq('status', 'Open')
+            .gte('tanggal_sidang', new Date().toISOString()); 
+          setAvailableSchedules(data || []);
+      };
+      fetchSchedules();
   }, [user, isAdmin]);
 
-  return (
-    <TestPageLayout
-      title="Dashboard PK"
-      description={isAdmin ? "Mode Administrator: Menampilkan seluruh data Litmas." : "Daftar tugas Litmas yang ditugaskan kepada Anda."}
-      permissionCode="access_pk"
-      icon={<User className="w-8 h-8 text-primary" />}
-    >
-      <div className="grid gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-blue-50 border-blue-200">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-blue-800">Total Tugas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-blue-900">{tasks.length}</div>
-                    <p className="text-xs text-blue-600">Litmas {isAdmin ? 'Terdaftar' : 'Aktif'}</p>
-                </CardContent>
-            </Card>
-        </div>
+  const handleUpload = async (file: File, taskId: number, type: 'surat_tugas' | 'hasil_litmas') => {
+    setUploadingId(taskId);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${type}/${taskId}_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file);
+      if (upErr) throw upErr;
 
+      let updateData: any = {};
+      if (type === 'surat_tugas') updateData = { surat_tugas_signed_url: path, status: 'On Progress' };
+      else updateData = { hasil_litmas_url: path, status: 'Review', anev_notes: null };
+
+      await supabase.from('litmas').update(updateData).eq('id_litmas', taskId);
+      toast({ title: "Berhasil", description: "Dokumen diupload." });
+      fetchMyTasks(); 
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Gagal", description: e.message });
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  // --- LOGIC PENDAFTARAN TPP (PILIH JADWAL) ---
+  const openRegisterDialog = (id: number) => {
+      setSelectedLitmasId(id);
+      setSelectedScheduleId('');
+      setIsRegisterOpen(true);
+  };
+
+  const confirmRegisterTPP = async () => {
+      if (!selectedScheduleId || !selectedLitmasId) return toast({ variant: "destructive", title: "Pilih jadwal dulu!" });
+
+      const { error } = await supabase
+        .from('litmas')
+        .update({ 
+            status: 'TPP Scheduled', // Langsung scheduled karena sudah pilih jadwal
+            tpp_schedule_id: selectedScheduleId 
+        } as any)
+        .eq('id_litmas', selectedLitmasId);
+
+      if (error) toast({ variant: "destructive", title: "Gagal", description: error.message });
+      else {
+          toast({ title: "Sukses", description: "Berhasil mendaftar ke jadwal sidang." });
+          setIsRegisterOpen(false);
+          fetchMyTasks();
+      }
+  };
+
+  const getStatus = (status: string | null) => status || 'New Task';
+
+  return (
+    <TestPageLayout title="Dashboard PK" description="Tugas Litmas & Pendaftaran Sidang" permissionCode="access_pk" icon={<User className="w-8 h-8 text-primary" />}>
+      <div className="grid gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Daftar Litmas {isAdmin ? '(Semua Petugas)' : 'Saya'}</CardTitle>
-                <CardDescription>
-                  {isAdmin 
-                    ? 'Anda memiliki akses penuh untuk melihat semua litmas yang sedang berjalan.' 
-                    : 'Hanya menampilkan data litmas yang ditugaskan kepada Anda.'}
-                </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchMyTasks} disabled={loading}>
-                <RefreshCcw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            </Button>
-          </CardHeader>
+          <CardHeader><CardTitle>Daftar Tugas</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>No. Surat</TableHead>
-                  <TableHead>Nama Klien</TableHead>
-                  {isAdmin && <TableHead>Petugas PK</TableHead>}
-                  <TableHead>Jenis Litmas</TableHead>
-                  <TableHead>Kategori</TableHead>
-                  <TableHead>Tgl Permintaan</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
+                  <TableHead>Klien</TableHead>
+                  <TableHead>Status & Jadwal</TableHead>
+                  <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.length > 0 ? (
-                  tasks.map((task) => (
+                {tasks.map((task) => {
+                    const status = getStatus(task.status);
+                    return (
                     <TableRow key={task.id_litmas}>
-                      <TableCell className="font-medium">{task.nomor_surat_permintaan}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col">
-                            <span className="font-semibold">{task.klien?.nama_klien || 'Tanpa Nama'}</span>
-                            <span className="text-xs text-slate-500">{task.klien?.nomor_register_lapas || '-'}</span>
-                        </div>
+                        <div className="font-bold">{task.klien?.nama_klien}</div>
+                        <div className="text-xs text-muted-foreground">Reg: {task.klien?.nomor_register_lapas}</div>
                       </TableCell>
-                      
-                      {isAdmin && (
-                        <TableCell>
-                            {task.petugas_pk ? (
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-blue-700">{task.petugas_pk.nama}</span>
-                                    <span className="text-xs text-slate-500">{task.petugas_pk.nip}</span>
+                      <TableCell>
+                        <div className="flex flex-col gap-2 items-start">
+                            <Badge className={
+                                status === 'Disetujui' ? 'bg-green-600' :
+                                status === 'Ditolak' ? 'bg-red-600' :
+                                status === 'On Progress' ? 'bg-blue-600' : 
+                                status === 'TPP Scheduled' ? 'bg-purple-600' :
+                                status === 'Selesai' ? 'bg-slate-700' :
+                                'bg-slate-600'
+                            }>
+                                {status === 'TPP Scheduled' ? 'Sidang Dijadwalkan' : status}
+                            </Badge>
+                            {/* INFO JADWAL DARI RELASI TABEL JADWAL */}
+                            {task.jadwal && (
+                                <div className="bg-purple-50 border border-purple-200 p-2 rounded text-xs text-purple-800">
+                                    <div className="font-bold flex gap-1"><Calendar className="w-3 h-3"/> {new Date(task.jadwal.tanggal_sidang).toLocaleDateString('id-ID')}</div>
+                                    <div>{task.jadwal.jenis_sidang}</div>
                                 </div>
-                            ) : (
-                                <span className="text-red-500 text-xs italic">Belum ditunjuk</span>
                             )}
-                        </TableCell>
-                      )}
-
-                      <TableCell>
-                        <Badge variant="outline" className="bg-slate-50">{task.jenis_litmas}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={task.klien?.kategori_usia === 'Anak' ? 'bg-orange-500' : 'bg-blue-600'}>
-                            {task.klien?.kategori_usia || 'Umum'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-500">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="w-3 h-3" />
-                            {task.tanggal_surat_permintaan}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Eye className="w-4 h-4 text-slate-600" />
-                            <span className="sr-only">Lihat Detail</span>
-                        </Button>
+                      <TableCell>
+                        <div className="space-y-2">
+                          
+                          {/* TAHAP 1: SURAT TUGAS */}
+                          {status === 'New Task' && (
+                            <div className="flex gap-2">
+                                <SuratTugasGenerator litmasId={task.id_litmas} />
+                                <div className="relative">
+                                    <Button size="sm" variant="secondary">Upload TTD</Button>
+                                    <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], task.id_litmas, 'surat_tugas')} />
+                                </div>
+                            </div>
+                          )}
+
+                          {/* TAHAP 2: LAPORAN */}
+                          {(status === 'On Progress' || status === 'Revision') && (
+                             <div className="relative">
+                                <Button size="sm" className="bg-blue-600 w-full hover:bg-blue-700">Upload Laporan</Button>
+                                <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], task.id_litmas, 'hasil_litmas')} />
+                             </div>
+                          )}
+
+                          {/* MENUNGGU REVIEW */}
+                          {status === 'Review' && (
+                            <div className="flex items-center gap-2 text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
+                                <Clock className="w-3 h-3"/> Menunggu Verifikasi
+                            </div>
+                          )}
+
+                          {/* SIAP DAFTAR TPP */}
+                          {status === 'Approved' && (
+                            <Button size="sm" variant="outline" className="border-green-600 text-green-700 w-full hover:bg-green-50" onClick={() => openRegisterDialog(task.id_litmas)}>
+                                Daftar Sidang TPP
+                            </Button>
+                          )}
+
+                          {/* SUDAH TERJADWAL */}
+                          {status === 'TPP Scheduled' && (
+                             <div className="flex items-center justify-center gap-2 text-xs text-purple-700 bg-purple-50 p-2 rounded border border-purple-200 font-bold">
+                                <CheckSquare className="w-4 h-4"/> Siap Sidang
+                             </div>
+                          )}
+
+                          {/* SELESAI */}
+                          {status === 'Selesai' && (
+                             <div className="flex items-center justify-center gap-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border">
+                                <CheckCircle className="w-4 h-4"/> Selesai
+                             </div>
+                          )}
+
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-slate-500">
-                        <div className="flex flex-col items-center gap-2">
-                            <FileText className="w-8 h-8 text-slate-300" />
-                            <p>Tidak ada tugas litmas yang ditemukan.</p>
-                        </div>
-                    </TableCell>
-                  </TableRow>
-                )}
+                  )})}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+
+        {/* MODAL PILIH JADWAL (Fitur No. 5) */}
+        <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Pilih Jadwal Sidang</DialogTitle><DialogDescription>Pilih salah satu jadwal yang dibuka oleh Operator TPP.</DialogDescription></DialogHeader>
+                <div className="py-4">
+                    <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
+                        <SelectTrigger><SelectValue placeholder="Pilih Tanggal..." /></SelectTrigger>
+                        <SelectContent>
+                            {availableSchedules.map(s => (
+                                <SelectItem key={s.id} value={s.id}>
+                                    {new Date(s.tanggal_sidang).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — {s.jenis_sidang}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <DialogFooter>
+                    <Button onClick={confirmRegisterTPP} className="bg-purple-600 hover:bg-purple-700">Daftar Sekarang</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </div>
     </TestPageLayout>
   );
